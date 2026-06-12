@@ -1,28 +1,29 @@
-mod agents;
 mod coordinator;
 mod fusion;
-mod sensors;
+mod agents;
 
-use fusion::{ResilientFusion, FusedMessage};
-use sensors::{RadarSensor, CameraSensor};
-// use agents::{ spawn_interceptor};
-use coordinator::Coordinator;
 use tokio::sync::broadcast;
-
-use crate::agents::{Analyzer, Interceptor, PatrolDrone};
+use crate::agents::{PatrolDrone, Interceptor, Analyzer};
+use crate::coordinator::Coordinator;
+use crate::fusion::FusedMessage;
 
 #[tokio::main]
 async fn main() {
-    let (tx, _rx) = broadcast::channel::<FusedMessage>(10);
+    let (tx, rx) = broadcast::channel(16);
 
-    PatrolDrone::spawn(tx.subscribe(), 1);
-    Interceptor::spawn(tx.subscribe());
-    Analyzer::spawn(tx.subscribe());
+    let mut coordinator = Coordinator::new();
+    coordinator.add_agent(Box::new(PatrolDrone { id: 1, radar_count: 0 }));
+  
+    let (agents, mission_log) = coordinator.into_parts();
+    Coordinator::spawn(rx, agents, mission_log.clone());
 
-    let system = Coordinator::new(
-        vec![Box::new(RadarSensor), Box::new(CameraSensor)],
-        ResilientFusion,
-        tx,
-    );
-    system.run().await;
+    // simulate fused messages
+    tx.send(FusedMessage::Radar("Ping".into())).unwrap();
+    tx.send(FusedMessage::Camera("Target".into())).unwrap();
+
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+    // inspect mission log after run
+    let log = mission_log.lock().unwrap();
+    println!("Final mission log: {:?}", *log);
 }

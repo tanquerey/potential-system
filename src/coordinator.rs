@@ -1,44 +1,55 @@
-use crate::sensors::Sensor;
-use crate::fusion::{FusionModule, FusedMessage};
+use crate::agents::Agent;
+use crate::fusion::FusedMessage;
+use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
-use tokio::time::{sleep, Duration};
+use tokio::task;
 
-pub struct Coordinator<F: FusionModule> {
-    sensors: Vec<Box<dyn Sensor>>,
-    fusion: F,
-    tx: broadcast::Sender<FusedMessage>,
+/// Coordinator with heterogeneous agents and shared mission log
+pub struct Coordinator {
+    agents: Vec<Box<dyn Agent>>,
+    mission_log: Arc<Mutex<Vec<String>>>,
 }
 
-impl<F: FusionModule> Coordinator<F> {
-    pub fn new(sensors: Vec<Box<dyn Sensor>>, fusion: F, tx: broadcast::Sender<FusedMessage>) -> Self {
-        Coordinator { sensors, fusion, tx }
+impl Coordinator {
+    pub fn new() -> Self {
+        Coordinator {
+            agents: Vec::new(),
+            mission_log: Arc::new(Mutex::new(Vec::new())),
+        }
     }
 
-    pub async fn run(&self) {
-        // let mut tick = 0;
-        loop {
-            // tick += 1;
+    pub fn add_agent(&mut self, agent: Box<dyn Agent>) {
+        self.agents.push(agent);
+    }
 
-            let inputs: Vec<String> = self.sensors.iter().map(|s| s.read()).collect();
-            let fused = self.fusion.fuse(inputs);
+    pub fn mission_log(&self) -> Arc<Mutex<Vec<String>>> {
+        Arc::clone(&self.mission_log)
+    }
 
-            // Example: tag based on content
-            let msg = if fused.contains("Radar") && fused.contains("Camera") {
-                FusedMessage::Combined(fused)
-            } else if fused.contains("Radar") {
-                FusedMessage::Radar(fused)
-            } else {
-                FusedMessage::Camera(fused)
-            };
+    pub fn spawn(
+        mut rx: broadcast::Receiver<FusedMessage>,
+        mut agents: Vec<Box<dyn Agent>>,
+        mission_log: Arc<Mutex<Vec<String>>>,
+    ) {
+        task::spawn(async move {
+            while let Ok(msg) = rx.recv().await {
+                let fused_str = format!("{:?}", msg);
 
-            println!("Coordinator fused: {:?}", msg);
+                for agent in agents.iter_mut() {
+                    let output = agent.act(&fused_str);
 
-            if self.tx.send(msg).is_err() {
-                println!("No agents listening, stopping coordinator.");
-                break;
+                    // push into shared mission log
+                    {
+                        let mut log = mission_log.lock().unwrap();
+                        log.push(output.clone());
+                    }
+
+                    println!("{}", output);
+                }
             }
-
-            sleep(Duration::from_secs(2)).await;
-        }
+        });
+    }
+    pub fn into_parts(self) -> (Vec<Box<dyn Agent>>, Arc<Mutex<Vec<String>>>) {
+        (self.agents, self.mission_log)
     }
 }
