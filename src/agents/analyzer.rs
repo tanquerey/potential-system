@@ -1,36 +1,25 @@
-use tokio::sync::broadcast;
+use crate::agents::Agent;
+use crate::agents::mission_entry::MissionEntry;
 
-use crate::fusion::FusedMessage;
-
+/// Analyzer agent: processes fused inputs and logs them
 pub struct Analyzer {
-    pub cycle_count: u32,
-    pub ignored_count: u32,
+    pub id: u32,
 }
 
-impl Analyzer {
-    pub fn spawn(mut rx: broadcast::Receiver<FusedMessage>) {
-        tokio::spawn(async move {
-            let mut analyzer = Analyzer { cycle_count: 0, ignored_count: 0 };
+impl Agent for Analyzer {
+    fn act<'a>(&mut self, fused_input: &'a str) -> MissionEntry {
+        let msg = if fused_input.contains("Camera") {
+            format!("Analyzer {} processed camera input: {}", self.id, fused_input)
+        } else if fused_input.contains("Radar") {
+            format!("Analyzer {} processed radar input: {}", self.id, fused_input)
+        } else {
+            format!("Analyzer {} idle, no relevant input", self.id)
+        };
 
-            while let Ok(msg) = rx.recv().await {
-                analyzer.cycle_count += 1;
+        MissionEntry::new(self.id, msg)
+    }
 
-                match msg {
-                    FusedMessage::Combined(data) => {
-                        println!("Analyzer logging combined input: {}", data);
-                    }
-                    _ => {
-                        analyzer.ignored_count += 1;
-                    }
-                }
-
-                if analyzer.cycle_count % 10 == 0 {
-                    println!(
-                        "Analyzer report: {} cycles, {} ignored messages",
-                        analyzer.cycle_count, analyzer.ignored_count
-                    );
-                }
-            }
-        });
+    fn id(&self) -> u32 {
+        self.id
     }
 }

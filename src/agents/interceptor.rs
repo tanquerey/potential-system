@@ -1,50 +1,29 @@
-use tokio::sync::broadcast;
-use tokio::task;
-use crate::fusion::FusedMessage;
-use std::time::{SystemTime, Duration};
+use crate::agents::{Agent, MissionEntry};
 
 pub struct Interceptor {
-    pub radar_events: Vec<SystemTime>,
-    pub window_size: usize,
+    pub id: u32,
+    pub last_radar_count: u32,
 }
 
-impl Interceptor {
-    pub fn spawn(mut rx: broadcast::Receiver<FusedMessage>) {
-        tokio::spawn(async move {
-            let mut interceptor = Interceptor {
-                radar_events: Vec::new(),
-                window_size: 5,
-            };
+impl Agent for Interceptor {
+    fn act<'a>(&mut self, fused_input: &'a str) -> MissionEntry {
+        let mut current_count = self.last_radar_count;
 
-            while let Ok(msg) = rx.recv().await {
-                match msg {
-                    FusedMessage::Radar(data) => {
-                        interceptor.radar_events.push(SystemTime::now());
+        if fused_input.contains("Radar") {
+            current_count += 1;
+        }
 
-                        // keep only last N events
-                        if interceptor.radar_events.len() > interceptor.window_size {
-                            interceptor.radar_events.remove(0);
-                        }
+        let msg = if current_count > self.last_radar_count {
+            format!("Interceptor {} detected new radar activity!", self.id)
+        } else {
+            format!("Interceptor {} no change in radar count", self.id)
+        };
 
-                        println!("Interceptor noted radar activity: {}", data);
-                    }
-                    FusedMessage::Camera(data) => {
-                        // count radar events in last 10 seconds
-                        let now = SystemTime::now();
-                        let recent_hits = interceptor.radar_events
-                            .iter()
-                            .filter(|&&t| now.duration_since(t).unwrap() < Duration::from_secs(10))
-                            .count();
+        self.last_radar_count = current_count;
+        MissionEntry::new(self.id, msg)
+    }
 
-                        if recent_hits >= 2 {
-                            println!("Interceptor LAUNCH: camera saw {}, radar active recently!", data);
-                        } else {
-                            println!("Interceptor ignored camera: {}", data);
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        });
+    fn id(&self) -> u32 {
+        self.id
     }
 }

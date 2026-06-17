@@ -1,20 +1,21 @@
-use crate::agents::Agent;
-use crate::fusion::FusedMessage;
-use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 use tokio::task;
+use std::sync::{Arc, Mutex};
+use crate::fusion::FusedMessage;
+use crate::agents::{Agent, MissionEntry};
 
-/// Coordinator with heterogeneous agents and shared mission log
 pub struct Coordinator {
     agents: Vec<Box<dyn Agent>>,
-    mission_log: Arc<Mutex<Vec<String>>>,
+    mission_log: Arc<Mutex<Vec<MissionEntry>>>,
+    idle_timeout: std::time::Duration,
 }
 
 impl Coordinator {
-    pub fn new() -> Self {
+    pub fn new(idle_timeout_secs: u64) -> Self {
         Coordinator {
             agents: Vec::new(),
             mission_log: Arc::new(Mutex::new(Vec::new())),
+                        idle_timeout: std::time::Duration::from_secs(idle_timeout_secs),
         }
     }
 
@@ -22,34 +23,48 @@ impl Coordinator {
         self.agents.push(agent);
     }
 
-    pub fn mission_log(&self) -> Arc<Mutex<Vec<String>>> {
+    pub fn mission_log(&self) -> Arc<Mutex<Vec<MissionEntry>>> {
         Arc::clone(&self.mission_log)
     }
 
+    pub fn into_parts(self) -> (Vec<Box<dyn Agent>>, Arc<Mutex<Vec<MissionEntry>>>) {
+        (self.agents, self.mission_log)
+    }
+
+pub fn idle_timeout(&self) -> std::time::Duration {
+        self.idle_timeout
+    }
+    
     pub fn spawn(
-        mut rx: broadcast::Receiver<FusedMessage>,
+        mut radar_rx: broadcast::Receiver<FusedMessage>,
+        mut camera_rx: broadcast::Receiver<FusedMessage>,
         mut agents: Vec<Box<dyn Agent>>,
-        mission_log: Arc<Mutex<Vec<String>>>,
+        mission_log: Arc<Mutex<Vec<MissionEntry>>>,
+        idle_timeout: std::time::Duration,
     ) {
         task::spawn(async move {
-            while let Ok(msg) = rx.recv().await {
-                let fused_str = format!("{:?}", msg);
-
-                for agent in agents.iter_mut() {
-                    let output = agent.act(&fused_str);
-
-                    // push into shared mission log
-                    {
-                        let mut log = mission_log.lock().unwrap();
-                        log.push(output.clone());
+            loop {
+                tokio::select! {
+                    Ok(msg) = radar_rx.recv() => {
+                        let fused_str = format!("Radar {:?}", msg);
+                        for agent in agents.iter_mut() {
+                            mission_log.lock().unwrap().push(agent.act(&fused_str));
+                        }
                     }
-
-                    println!("{}", output);
+                    Ok(msg) = camera_rx.recv() => {
+                        let fused_str = format!("Camera {:?}", msg);
+                        for agent in agents.iter_mut() {
+                            mission_log.lock().unwrap().push(agent.act(&fused_str));
+                        }
+                    }
+                    _ = tokio::time::sleep(idle_timeout) => {
+                        let idle_entry = MissionEntry::new(0, format!("Coordinator idle for {:?}s", idle_timeout.as_secs()));
+                        mission_log.lock().unwrap().push(idle_entry);
+                    }
                 }
             }
         });
     }
-    pub fn into_parts(self) -> (Vec<Box<dyn Agent>>, Arc<Mutex<Vec<String>>>) {
-        (self.agents, self.mission_log)
-    }
+
+
 }

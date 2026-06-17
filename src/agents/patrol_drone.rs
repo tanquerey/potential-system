@@ -1,6 +1,4 @@
-use tokio::sync::broadcast;
-
-use crate::{agents::Agent, fusion::FusedMessage};
+use crate::agents::{Agent, MissionEntry};
 
 pub struct PatrolDrone {
     pub id: u32,
@@ -8,8 +6,8 @@ pub struct PatrolDrone {
 }
 
 impl Agent for PatrolDrone {
-    fn act(&mut self, fused_input: &str) -> String {
-        if fused_input.contains("Radar") {
+    fn act<'a>(&mut self, fused_input: &'a str) -> MissionEntry {
+        let msg = if fused_input.contains("Radar") {
             self.radar_count += 1;
             if self.radar_count >= 3 {
                 self.radar_count = 0;
@@ -19,16 +17,13 @@ impl Agent for PatrolDrone {
             }
         } else {
             format!("PatrolDrone {} idle", self.id)
-        }
+        };
+
+        MissionEntry::new(self.id, msg)
+    }
+    
+    fn id(&self) -> u32 {
+        self.id
     }
 }
 
-fn spawn(mut rx: tokio::sync::broadcast::Receiver<FusedMessage>, id: u32) {
-    tokio::spawn(async move {
-        let mut drone = PatrolDrone { id, radar_count: 0 };
-        while let Ok(msg) = rx.recv().await {
-            let fused_str = format!("{:?}", msg);
-            println!("{}", drone.act(&fused_str));
-        }
-    });
-}
