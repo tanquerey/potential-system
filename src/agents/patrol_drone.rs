@@ -1,4 +1,7 @@
-use crate::agents::{Agent, MissionEntry};
+use crate::{
+    agents::{Agent, MissionEntry},
+    event::MissionEvent,
+};
 
 pub struct PatrolDrone {
     pub id: u32,
@@ -6,24 +9,27 @@ pub struct PatrolDrone {
 }
 
 impl Agent for PatrolDrone {
-    fn act<'a>(&mut self, fused_input: &'a str) -> MissionEntry {
-        let msg = if fused_input.contains("Radar") {
-            self.radar_count += 1;
-            if self.radar_count >= 3 {
-                self.radar_count = 0;
-                format!("PatrolDrone {} ALERT: multiple radar detections!", self.id)
-            } else {
-                format!("PatrolDrone {} responding to {}", self.id, fused_input)
+    fn act(&mut self, event: &MissionEvent) -> MissionEntry {
+        match event {
+            MissionEvent::Radar(msg) => {
+                // Example: if radar_count exceeds threshold, raise an alert
+                if self.radar_count > 3 {
+                    MissionEntry::new(
+                        self.id,
+                        MissionEvent::Alert(format!(
+                            "PatrolDrone {} ALERT: multiple radar detections!",
+                            self.id
+                        )),
+                    )
+                } else {
+                    MissionEntry::new(self.id, MissionEvent::Radar(msg.clone()))
+                }
             }
-        } else {
-            format!("PatrolDrone {} idle", self.id)
-        };
-
-        MissionEntry::new(self.id, msg)
+            _ => MissionEntry::new(self.id, event.clone()),
+        }
     }
-    
+
     fn id(&self) -> u32 {
         self.id
     }
 }
-

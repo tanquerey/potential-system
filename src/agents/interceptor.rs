@@ -1,29 +1,45 @@
-use crate::agents::{Agent, MissionEntry};
+use crate::{agents::MissionEntry, coordinator::Coordinator, event::MissionEvent};
+use std::time::{Duration, Instant};
 
 pub struct Interceptor {
     pub id: u32,
-    pub last_radar_count: u32,
+    pub radar_count: u32,
+    pub last_reset: Instant,
 }
 
-impl Agent for Interceptor {
-    fn act<'a>(&mut self, fused_input: &'a str) -> MissionEntry {
-        let mut current_count = self.last_radar_count;
-
-        if fused_input.contains("Radar") {
-            current_count += 1;
+impl Interceptor {
+    pub fn new(id: u32) -> Self {
+        Interceptor {
+            id,
+            radar_count: 0,
+            last_reset: Instant::now(),
         }
-
-        let msg = if current_count > self.last_radar_count {
-            format!("Interceptor {} detected new radar activity!", self.id)
-        } else {
-            format!("Interceptor {} no change in radar count", self.id)
-        };
-
-        self.last_radar_count = current_count;
-        MissionEntry::new(self.id, msg)
     }
 
-    fn id(&self) -> u32 {
-        self.id
+    pub fn act(&mut self, event: &MissionEvent, coordinator: &Coordinator) -> MissionEntry {
+        match event {
+            MissionEvent::Radar(_msg) => {
+                self.radar_count += 1;
+
+                // Reset window every 10 seconds
+                if self.last_reset.elapsed() > Duration::from_secs(10) {
+                    self.radar_count = 1;
+                    self.last_reset = Instant::now();
+                }
+
+                if self.radar_count >= 3 {
+                    // Interceptor decides this is an Alert
+                    let alert = MissionEvent::Alert(format!(
+                        "Interceptor {} escalated: multiple radar hits in 10s window!",
+                        self.id
+                    ));
+                    // Dispatch alert back into system
+                    coordinator.dispatch(alert);
+                }
+
+                MissionEntry::new(self.id, MissionEvent::Radar("Radar ping".into()))
+            }
+            _ => MissionEntry::new(self.id, event.clone()),
+        }
     }
 }

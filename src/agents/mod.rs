@@ -1,15 +1,14 @@
-pub mod patrol_drone;
 pub mod interceptor;
-pub mod analyzer;
 pub mod mission_entry;
+pub mod patrol_drone;
 
-pub use patrol_drone::PatrolDrone;
 pub use interceptor::Interceptor;
-pub use analyzer::Analyzer;
 pub use mission_entry::MissionEntry;
+pub use patrol_drone::PatrolDrone;
 
-pub trait Agent: Send + 'static {
-    fn act<'a>(&mut self, fused_input: &'a str) -> MissionEntry;
+use crate::event::MissionEvent;
+
+pub trait Agent {
+    fn act(&mut self, fused_input: &MissionEvent) -> MissionEntry;
     fn id(&self) -> u32; // helper so Coordinator can tag entries
 }
-
