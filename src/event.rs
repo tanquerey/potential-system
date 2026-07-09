@@ -3,5 +3,6 @@ pub enum MissionEvent {
     Radar(String),
     Camera(String),
     Alert(String),
-    Idle,
+    Command(String),
+    Idle(String),
 }

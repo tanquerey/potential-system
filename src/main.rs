@@ -2,7 +2,9 @@ mod agents;
 mod coordinator;
 mod event;
 mod fusion;
-use crate::agents::PatrolDrone;
+use std::time::Instant;
+
+use crate::agents::{Interceptor, PatrolDrone};
 use crate::coordinator::Coordinator;
 use crate::event::MissionEvent;
 use tokio::sync::mpsc;
@@ -19,8 +21,11 @@ async fn main() {
     let drone = PatrolDrone {
         id: 1,
         radar_count: 0,
+        last_reset: Instant::now(),
     };
+    let interceptor = Interceptor { id: 2 };
     coordinator.add_agent(Box::new(drone));
+    coordinator.add_agent(Box::new(interceptor));
 
     // Spawn coordinator task
     let coordinator_task = tokio::spawn(async move {
@@ -32,11 +37,10 @@ async fn main() {
     tx.send(MissionEvent::Camera("Target acquired".into()))
         .await
         .unwrap();
-    tx.send(MissionEvent::Idle).await.unwrap();
-    tx.send(MissionEvent::Alert("Intruder detected".into()))
-        .await
-        .unwrap();
+    tx.send(MissionEvent::Radar("Ping".into())).await.unwrap();
 
+    tx.send(MissionEvent::Idle("test idle".into())).await.unwrap();
+    tx.send(MissionEvent::Radar("Ping".into())).await.unwrap();
     // Wait for coordinator to finish (in real system, this would run indefinitely)
     coordinator_task.await.unwrap();
 }

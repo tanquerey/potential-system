@@ -21,11 +21,18 @@ impl Coordinator {
 
     pub async fn run(&mut self, mut receiver: mpsc::Receiver<MissionEvent>) {
         while let Some(event) = receiver.recv().await {
+            // Step 1: collect entries
+            let mut entries = Vec::new();
             for agent in &mut self.agents {
-                let entry = agent.act(&event); // pass coordinator if needed
+                entries.push(agent.act(&event));
+            }
+
+            // Step 2: process entries after loop (no mutable borrow of agents now)
+            for entry in entries {
                 match &entry.event {
                     MissionEvent::Alert(msg) => {
-                        println!("*** ALERT from Agent {}: {} ***", entry.agent_id, msg)
+                        println!("*** ALERT from Agent {}: {} ***", entry.agent_id, msg);
+                        self.dispatch(MissionEvent::Command("Engage".into()));
                     }
                     MissionEvent::Radar(msg) => {
                         println!("Radar from Agent {}: {}", entry.agent_id, msg)
@@ -33,7 +40,10 @@ impl Coordinator {
                     MissionEvent::Camera(msg) => {
                         println!("Camera from Agent {}: {}", entry.agent_id, msg)
                     }
-                    MissionEvent::Idle => println!("Agent {} idle", entry.agent_id),
+                    MissionEvent::Command(msg) => {
+                        println!("Command executed by Agent {}: {}", entry.agent_id, msg)
+                    }
+                    MissionEvent::Idle(msg) => println!("Agent {} idle", entry.agent_id),
                 }
             }
         }
