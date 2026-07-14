@@ -1,18 +1,14 @@
-use crate::agents::{Agent, MissionEntry};
+use crate::agents::{Agent, Interceptor};
 use crate::event::MissionEvent;
 use tokio::sync::mpsc;
 
 pub struct Coordinator {
     agents: Vec<Box<dyn Agent + Send + Sync>>,
-    sender: mpsc::Sender<MissionEvent>,
 }
 
 impl Coordinator {
-    pub fn new(sender: mpsc::Sender<MissionEvent>) -> Self {
-        Coordinator {
-            agents: Vec::new(),
-            sender,
-        }
+    pub fn new() -> Self {
+        Coordinator { agents: Vec::new() }
     }
 
     pub fn add_agent(&mut self, agent: Box<dyn Agent + Send + Sync>) {
@@ -20,19 +16,22 @@ impl Coordinator {
     }
 
     pub async fn run(&mut self, mut receiver: mpsc::Receiver<MissionEvent>) {
+        let mut interceptor = Interceptor { id: 3 };
+
         while let Some(event) = receiver.recv().await {
-            // Step 1: collect entries
             let mut entries = Vec::new();
             for agent in &mut self.agents {
                 entries.push(agent.act(&event));
             }
 
-            // Step 2: process entries after loop (no mutable borrow of agents now)
             for entry in entries {
                 match &entry.event {
-                    MissionEvent::Alert(msg) => {
-                        println!("*** ALERT from Agent {}: {} ***", entry.agent_id, msg);
-                        self.dispatch(MissionEvent::Command("Engage".into()));
+                    MissionEvent::Alert(target_dist) | MissionEvent::Intercept(target_dist) => {
+                        println!(
+                            "ALERT from Agent {}: Intercepting target at distance {}",
+                            entry.agent_id, target_dist
+                        );
+                        interceptor.act(&MissionEvent::Intercept(*target_dist));
                     }
                     MissionEvent::Radar(msg) => {
                         println!("Radar from Agent {}: {}", entry.agent_id, msg)
@@ -43,18 +42,9 @@ impl Coordinator {
                     MissionEvent::Command(msg) => {
                         println!("Command executed by Agent {}: {}", entry.agent_id, msg)
                     }
-                    MissionEvent::Idle(msg) => println!("Agent {} idle", entry.agent_id),
+                    MissionEvent::Idle(_msg) => println!("Agent {} idle", entry.agent_id),
                 }
             }
         }
-    }
-
-    pub fn dispatch(&self, event: MissionEvent) {
-        let sender = self.sender.clone();
-        tokio::spawn(async move {
-            if let Err(e) = sender.send(event).await {
-                eprintln!("Failed to dispatch event: {}", e);
-            }
-        });
     }
 }

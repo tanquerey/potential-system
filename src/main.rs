@@ -1,10 +1,11 @@
 mod agents;
 mod coordinator;
 mod event;
-mod fusion;
+mod transform;
 use std::time::Instant;
 
-use crate::agents::{Interceptor, PatrolDrone};
+use crate::agents::patrol_drone::Target;
+use crate::agents::{PatrolDrone};
 use crate::coordinator::Coordinator;
 use crate::event::MissionEvent;
 use tokio::sync::mpsc;
@@ -15,17 +16,26 @@ async fn main() {
     let (tx, rx) = mpsc::channel(32);
 
     // Create coordinator with sender
-    let mut coordinator = Coordinator::new(tx.clone());
+    let mut coordinator = Coordinator::new();
 
     // Add a patrol drone agent
+    let dummy_target1 = Target {
+        target_dist: 0,            // placeholder distance
+        last_seen: Instant::now(), // current time as dummy
+    };
+    let dummy_target2 = Target {
+        target_dist: 0,            // placeholder distance
+        last_seen: Instant::now(), // current time as dummy
+    };
     let drone = PatrolDrone {
         id: 1,
         radar_count: 0,
-        last_reset: Instant::now(),
+        radar_count_last_reset: Instant::now(),
+        target_detected_from_camera: dummy_target1,
+        target_detected_from_radar: dummy_target2,
     };
-    let interceptor = Interceptor { id: 2 };
+
     coordinator.add_agent(Box::new(drone));
-    coordinator.add_agent(Box::new(interceptor));
 
     // Spawn coordinator task
     let coordinator_task = tokio::spawn(async move {
@@ -33,14 +43,12 @@ async fn main() {
     });
 
     // Dispatch some events
-    tx.send(MissionEvent::Radar("Ping".into())).await.unwrap();
-    tx.send(MissionEvent::Camera("Target acquired".into()))
+    tx.send(MissionEvent::Radar(20)).await.unwrap();
+    tx.send(MissionEvent::Camera(20)).await.unwrap();
+    // tx.send(MissionEvent::Radar(16)).await.unwrap();
+    // tx.send(MissionEvent::Radar(17)).await.unwrap();
+    tx.send(MissionEvent::Idle("test idle".into()))
         .await
         .unwrap();
-    tx.send(MissionEvent::Radar("Ping".into())).await.unwrap();
-
-    tx.send(MissionEvent::Idle("test idle".into())).await.unwrap();
-    tx.send(MissionEvent::Radar("Ping".into())).await.unwrap();
-    // Wait for coordinator to finish (in real system, this would run indefinitely)
     coordinator_task.await.unwrap();
 }
