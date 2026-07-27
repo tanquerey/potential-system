@@ -1,15 +1,28 @@
+use flux_perception::{Engine, FusedSignal};
+
+use std::sync::OnceLock;
+use std::time::Instant;
+
 use crate::{agents::patrol_drone::Target, event::MissionEvent, transform::DecisionModule};
 
-pub struct CombinedTargetDecisionModule;
+pub struct SensorAwareDecision;
 
-impl DecisionModule for CombinedTargetDecisionModule {
-    fn decide(&self, targets: Vec<&Target>) -> MissionEvent {
-        let target_dist = targets[0].target_dist;
+impl DecisionModule for SensorAwareDecision {
+    fn decide(&self, engine: &Engine) -> MissionEvent {
+        let fs: FusedSignal = engine.read();
 
-        if targets.iter().all(|t| t.target_dist == target_dist) {
-            MissionEvent::Intercept(target_dist)
+        println!(
+            "FLUX Perception value {}, source_count={}, confidence={}, variance={})",
+                fs.value, fs.source_count, fs.confidence, fs.variance
+        );
+        // Decide based on fused confidence
+        if fs.confidence >= 0.5 {
+            MissionEvent::Intercept(fs.value)
         } else {
-            MissionEvent::Idle("".into())
+            MissionEvent::Idle(format!(
+                "Low confidence (value={}, source_count={}, confidence={}, variance={})",
+                fs.value, fs.source_count, fs.confidence, fs.variance
+            ))
         }
     }
 }

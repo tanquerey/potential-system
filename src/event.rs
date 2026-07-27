@@ -1,9 +1,9 @@
 #[derive(Debug, Clone)]
 pub enum MissionEvent {
-    Radar(u32),
-    Intercept(u32),
-    Camera(u32),
-    Alert(u32),
+    Radar(f64),
+    Intercept(f64),
+    Camera(f64),
+    Alert(f64),
     Command(String),
     Idle(String),
 }

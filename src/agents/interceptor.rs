@@ -1,3 +1,5 @@
+use flux_perception::Engine;
+
 use crate::{
     agents::{Agent, MissionEntry},
     coordinator::Coordinator,
@@ -15,7 +17,7 @@ impl Interceptor {
     }
 }
 impl Agent for Interceptor {
-    fn act(&mut self, event: &MissionEvent) -> MissionEntry {
+    fn act(&mut self, event: &MissionEvent, _engine: &mut Engine) -> MissionEntry {
         match event {
             MissionEvent::Intercept(target_dist) => {
                 println!("Interceptor {} received Intercept cmd for target at : {}", self.id, target_dist);

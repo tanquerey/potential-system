@@ -1,5 +1,6 @@
 use crate::agents::{Agent, Interceptor};
 use crate::event::MissionEvent;
+use flux_perception::Engine;
 use tokio::sync::mpsc;
 
 pub struct Coordinator {
@@ -15,13 +16,17 @@ impl Coordinator {
         self.agents.push(agent);
     }
 
-    pub async fn run(&mut self, mut receiver: mpsc::Receiver<MissionEvent>) {
+    pub async fn run(
+        &mut self,
+        mut receiver: mpsc::Receiver<MissionEvent>,
+        mut engine: &mut Engine,
+    ) {
         let mut interceptor = Interceptor { id: 3 };
 
         while let Some(event) = receiver.recv().await {
             let mut entries = Vec::new();
             for agent in &mut self.agents {
-                entries.push(agent.act(&event));
+                entries.push(agent.act(&event, &mut engine));
             }
 
             for entry in entries {
@@ -31,7 +36,7 @@ impl Coordinator {
                             "ALERT from Agent {}: Intercepting target at distance {}",
                             entry.agent_id, target_dist
                         );
-                        interceptor.act(&MissionEvent::Intercept(*target_dist));
+                        interceptor.act(&MissionEvent::Intercept(*target_dist), &mut engine);
                     }
                     MissionEvent::Radar(msg) => {
                         println!("Radar from Agent {}: {}", entry.agent_id, msg)
@@ -42,7 +47,9 @@ impl Coordinator {
                     MissionEvent::Command(msg) => {
                         println!("Command executed by Agent {}: {}", entry.agent_id, msg)
                     }
-                    MissionEvent::Idle(_msg) => println!("Agent {} idle", entry.agent_id),
+                    MissionEvent::Idle(msg) => {
+                        println!("Agent {} is Idle with msg:{}", entry.agent_id, msg)
+                    }
                 }
             }
         }

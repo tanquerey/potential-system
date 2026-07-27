@@ -1,6 +1,9 @@
 pub mod decision;
 pub mod resilient;
 pub mod simple;
+pub mod confidence;
+
+use flux_perception::Engine;
 
 use crate::{agents::patrol_drone::Target, event::MissionEvent};
 pub trait FusionModule {
@@ -8,7 +11,7 @@ pub trait FusionModule {
 }
 
 pub trait DecisionModule {
-    fn decide(&self, inputs: Vec<&Target>) -> MissionEvent;
+    fn decide(&self, engine : &Engine) -> MissionEvent;
 }
 
 #[derive(Debug, Clone)]

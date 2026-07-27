@@ -1,68 +1,48 @@
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+use flux_perception::Engine;
 
 use crate::{
-    agents::{Agent, MissionEntry},
-    event::MissionEvent,
-    transform::{DecisionModule, decision::CombinedTargetDecisionModule},
+    agents::{Agent, MissionEntry}, event::MissionEvent, transform::{DecisionModule, decision::{ SensorAwareDecision}},
 };
 
 pub struct PatrolDrone {
     pub id: u32,
     pub radar_count: u32,
-    pub radar_count_last_reset: Instant,
-    pub target_detected_from_camera: Target,
-    pub target_detected_from_radar: Target,
+    pub radar_count_last_reset: Instant
 }
 
 pub struct Target {
-    pub target_dist: u32,
+    pub sensor_id: u8,
+    pub target_dist: f64,
     pub last_seen: Instant,
 }
 
+fn now_u64() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time is before UNIX_EPOCH")
+        .as_millis() as u64
+}
+
 impl Agent for PatrolDrone {
-    fn act(&mut self, event: &MissionEvent) -> MissionEntry {
-        let decision_module = CombinedTargetDecisionModule;
+    fn act(&mut self, event: &MissionEvent, engine: &mut Engine) -> MissionEntry {
+        
+        let sensor_aware_module = SensorAwareDecision;
+
         match event {
             MissionEvent::Radar(target_dist) => {
-                self.radar_count += 1;
-                self.target_detected_from_radar = Target {
-                    target_dist: *target_dist,
-                    last_seen: Instant::now(),
-                };
 
-                let return_event;
-                // Reset window every 10 seconds
-                if self.radar_count_last_reset.elapsed() > Duration::from_secs(10) {
-                    self.radar_count = 1;
-                    self.radar_count_last_reset = Instant::now();
-                }
+                engine.update(1, *target_dist, 1.0, now_u64());
 
-                if self.radar_count >= 3 {
-                    return_event = MissionEvent::Alert(
-                        *target_dist,
-                        // "Multiple radar hits in 10s window, Alert by agent {} sent to Coordinator",
-                    )
-                } else {
-                    return_event = decision_module.decide(vec![
-                        &self.target_detected_from_camera,
-                        &self.target_detected_from_radar,
-                    ]);
-                }
-                MissionEntry::new(self.id, return_event)
+                return MissionEntry::new(1, sensor_aware_module.decide(&engine));
             }
 
             MissionEvent::Camera(target_dist) => {
-                self.target_detected_from_camera = Target {
-                    target_dist: *target_dist,
-                    last_seen: Instant::now(),
-                };
-                MissionEntry::new(
-                    self.id,
-                    decision_module.decide(vec![
-                        &self.target_detected_from_camera,
-                        &self.target_detected_from_radar,
-                    ]),
-                )
+                
+                engine.update(2, *target_dist, 1.0, now_u64());
+
+                return MissionEntry::new(1, sensor_aware_module.decide(&engine));
             }
 
             _ => MissionEntry::new(self.id, event.clone()),
