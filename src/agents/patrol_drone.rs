@@ -1,21 +1,18 @@
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
+use flux_confidence::Confidence;
 use flux_perception::Engine;
 
 use crate::{
-    agents::{Agent, MissionEntry}, event::MissionEvent, transform::{DecisionModule, decision::{ SensorAwareDecision}},
+    agents::{Agent, MissionEntry},
+    event::MissionEvent,
+    transform::{DecisionModule, decision::SensorAwareDecision},
 };
 
 pub struct PatrolDrone {
     pub id: u32,
-    pub radar_count: u32,
-    pub radar_count_last_reset: Instant
-}
-
-pub struct Target {
-    pub sensor_id: u8,
-    pub target_dist: f64,
-    pub last_seen: Instant,
+    pub camera_confidence: Confidence,
+    pub radar_confidence: Confidence,
 }
 
 fn now_u64() -> u64 {
@@ -27,22 +24,29 @@ fn now_u64() -> u64 {
 
 impl Agent for PatrolDrone {
     fn act(&mut self, event: &MissionEvent, engine: &mut Engine) -> MissionEntry {
-        
         let sensor_aware_module = SensorAwareDecision;
 
         match event {
             MissionEvent::Radar(target_dist) => {
+                
+                // println!("Radar confidence Before :{} with agreement :{}", self.radar_confidence.value(), engine.agreement());
+                self.radar_confidence.update(engine.agreement(), 1.0); 
+                // println!("Radar confidence After :{} with agreement :{}", self.radar_confidence.value(), engine.agreement());
+                self.radar_confidence.decay();
+                engine.update(1, *target_dist, self.radar_confidence.value(), now_u64());
 
-                engine.update(1, *target_dist, 1.0, now_u64());
-
-                return MissionEntry::new(1, sensor_aware_module.decide(&engine));
+                return MissionEntry::new(1, sensor_aware_module.decide(engine));
             }
 
             MissionEvent::Camera(target_dist) => {
                 
-                engine.update(2, *target_dist, 1.0, now_u64());
+                // println!("Camera confidence Before :{} with agreement :{}", self.camera_confidence.value(), engine.agreement());
+                self.camera_confidence.update(engine.agreement(), 1.0);
+                // println!("Camera confidence After :{} with agreement :{}", self.camera_confidence.value(), engine.agreement());
 
-                return MissionEntry::new(1, sensor_aware_module.decide(&engine));
+                engine.update(2, *target_dist, self.camera_confidence.value(), now_u64());
+
+                return MissionEntry::new(1, sensor_aware_module.decide(engine));
             }
 
             _ => MissionEntry::new(self.id, event.clone()),

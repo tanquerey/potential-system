@@ -2,11 +2,11 @@ mod agents;
 mod coordinator;
 mod event;
 mod transform;
-use std::time::Instant;
 
 use crate::agents::PatrolDrone;
 use crate::coordinator::Coordinator;
 use crate::event::MissionEvent;
+use flux_confidence::Confidence;
 use flux_perception::Engine;
 use tokio::sync::mpsc;
 
@@ -20,13 +20,13 @@ async fn main() {
 
     let drone = PatrolDrone {
         id: 1,
-        radar_count: 0,
-        radar_count_last_reset: Instant::now(),
+        camera_confidence: Confidence::new(0.7),
+        radar_confidence: Confidence::new(0.7),
     };
 
     coordinator.add_agent(Box::new(drone));
 
-    let mut engine = Engine::new(0.8);
+    let mut engine = Engine::new(0.4);
     engine.add_sensor(1, 0.3, 0.0); // radar: higher weight
     engine.add_sensor(2, 0.7, 0.0); // camera
 
@@ -43,6 +43,8 @@ async fn main() {
     tx.send(MissionEvent::Camera(25.0)).await.unwrap();
     // tx.send(MissionEvent::Radar(16)).await.unwrap();
     // tx.send(MissionEvent::Radar(17)).await.unwrap();
+    tx.send(MissionEvent::Radar(30.0)).await.unwrap();
+    tx.send(MissionEvent::Camera(50.0)).await.unwrap();
     tx.send(MissionEvent::Idle("test idle2".into()))
         .await
         .unwrap();

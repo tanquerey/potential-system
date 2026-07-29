@@ -1,9 +1,6 @@
 use flux_perception::{Engine, FusedSignal};
 
-use std::sync::OnceLock;
-use std::time::Instant;
-
-use crate::{agents::patrol_drone::Target, event::MissionEvent, transform::DecisionModule};
+use crate::{event::MissionEvent, transform::DecisionModule};
 
 pub struct SensorAwareDecision;
 
