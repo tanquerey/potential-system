@@ -3,6 +3,7 @@ mod coordinator;
 mod event;
 mod transform;
 
+use crate::agents::AgentType::Patrol;
 use crate::agents::PatrolDrone;
 use crate::coordinator::Coordinator;
 use crate::event::MissionEvent;
@@ -12,6 +13,12 @@ use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() {
+    struct SensorId {
+        id: u8,
+    }
+    const RADAR: SensorId = SensorId { id: 1 };
+    const CAMERA: SensorId = SensorId { id: 2 };
+
     // Channel for mission events
     let (tx, rx) = mpsc::channel(3);
 
@@ -24,11 +31,11 @@ async fn main() {
         radar_confidence: Confidence::new(0.7),
     };
 
-    coordinator.add_agent(Box::new(drone));
+    coordinator.add_agent(Patrol(drone));
 
     let mut engine = Engine::new(0.4);
-    engine.add_sensor(1, 0.3, 0.0); // radar: higher weight
-    engine.add_sensor(2, 0.7, 0.0); // camera
+    engine.add_sensor(RADAR.id, 0.3, 0.0); // radar: higher weight
+    engine.add_sensor(CAMERA.id, 0.7, 0.0); // camera
 
     // Spawn coordinator task
     let coordinator_task = tokio::spawn(async move {

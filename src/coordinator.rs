@@ -1,10 +1,10 @@
-use crate::agents::{Agent, Interceptor};
+use crate::agents::{Agent, AgentType, Interceptor};
 use crate::event::MissionEvent;
 use flux_perception::Engine;
 use tokio::sync::mpsc;
 
 pub struct Coordinator {
-    agents: Vec<Box<dyn Agent + Send + Sync>>,
+    agents: Vec<AgentType>,
 }
 
 impl Coordinator {
@@ -12,7 +12,7 @@ impl Coordinator {
         Coordinator { agents: Vec::new() }
     }
 
-    pub fn add_agent(&mut self, agent: Box<dyn Agent + Send + Sync>) {
+    pub fn add_agent(&mut self, agent: AgentType) {
         self.agents.push(agent);
     }
 
@@ -26,7 +26,10 @@ impl Coordinator {
         while let Some(event) = receiver.recv().await {
             let mut entries = Vec::new();
             for agent in &mut self.agents {
-                entries.push(agent.act(&event, &mut engine));
+                match agent.act(&event, &mut engine) {
+                    Ok(entry) => entries.push(entry),
+                    Err(e) => eprintln!("Agent {} failed to act: {:?}", agent.id(), e),
+                }
             }
 
             for entry in entries {
@@ -36,7 +39,11 @@ impl Coordinator {
                             "ALERT from Agent {}: Intercepting target at distance {}",
                             entry.agent_id, target_dist
                         );
-                        interceptor.act(&MissionEvent::Intercept(*target_dist), &mut engine);
+                        if let Err(e) =
+                            interceptor.act(&MissionEvent::Intercept(*target_dist), &mut engine)
+                        {
+                            eprintln!("Interceptor failed: {:?}", e);
+                        }
                     }
                     MissionEvent::Radar(msg) => {
                         println!("Radar from Agent {}: {}", entry.agent_id, msg)

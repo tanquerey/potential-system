@@ -1,15 +1,17 @@
 pub mod interceptor;
 pub mod mission_entry;
 pub mod patrol_drone;
+pub mod agent_type;
 
 use flux_perception::Engine;
 pub use interceptor::Interceptor;
 pub use mission_entry::MissionEntry;
 pub use patrol_drone::PatrolDrone;
+pub use agent_type::AgentType;
 
-use crate::event::MissionEvent;
+use crate::{agents::patrol_drone::EngineError, event::MissionEvent};
 
 pub trait Agent {
-    fn act(&mut self, fused_input: &MissionEvent, engine: &mut Engine) -> MissionEntry;
+    fn act(&mut self, fused_input: &MissionEvent, engine: &mut Engine) -> Result<MissionEntry, EngineError>;
     fn id(&self) -> u32; // helper so Coordinator can tag entries
 }
