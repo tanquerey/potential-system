@@ -1,5 +1,5 @@
 use crate::agents::{Agent, AgentType, Interceptor};
-use crate::event::MissionEvent;
+use crate::event::MissionEvent::{self, Intercept};
 use flux_perception::Engine;
 use tokio::sync::mpsc;
 
@@ -34,28 +34,40 @@ impl Coordinator {
 
             for entry in entries {
                 match &entry.event {
-                    MissionEvent::Alert(target_dist) | MissionEvent::Intercept(target_dist) => {
-                        println!(
-                            "ALERT from Agent {}: Intercepting target at distance {}",
-                            entry.agent_id, target_dist
-                        );
-                        if let Err(e) =
-                            interceptor.act(&MissionEvent::Intercept(*target_dist), &mut engine)
-                        {
-                            eprintln!("Interceptor failed: {:?}", e);
+                    MissionEvent::Alert(target_dist) => match target_dist.clone().intercept() {
+                        Some(intercepting) => {
+                            println!(
+                                "ALERT from Agent {}: Intercepting target at distance {:?}",
+                                entry.agent_id, target_dist
+                            );
+                            if let Err(e) = interceptor.act(&Intercept(intercepting), &mut engine) {
+                                eprintln!("Interceptor failed: {:?}", e);
+                            }
                         }
-                    }
+                        None => {
+                            println!(
+                                "ALERT from Agent {}: target at {:?} not confident enough to intercept",
+                                entry.agent_id, target_dist
+                            );
+                        }
+                    },
                     MissionEvent::Radar(msg) => {
-                        println!("Radar from Agent {}: {}", entry.agent_id, msg)
+                        println!("Radar from Agent {}: {:?}", entry.agent_id, msg)
                     }
                     MissionEvent::Camera(msg) => {
-                        println!("Camera from Agent {}: {}", entry.agent_id, msg)
+                        println!("Camera from Agent {}: {:?}", entry.agent_id, msg)
                     }
                     MissionEvent::Command(msg) => {
                         println!("Command executed by Agent {}: {}", entry.agent_id, msg)
                     }
                     MissionEvent::Idle(msg) => {
                         println!("Agent {} is Idle with msg:{}", entry.agent_id, msg)
+                    }
+                    MissionEvent::Intercept(intercepting) => {
+                        println!(
+                            "Agent {} intercepted :{}",
+                            entry.agent_id, intercepting.dist
+                        )
                     }
                 }
             }

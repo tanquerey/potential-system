@@ -5,6 +5,7 @@ mod transform;
 
 use crate::agents::AgentType::Patrol;
 use crate::agents::PatrolDrone;
+use crate::agents::target::Detected;
 use crate::coordinator::Coordinator;
 use crate::event::MissionEvent;
 use flux_confidence::Confidence;
@@ -46,12 +47,12 @@ async fn main() {
     tx.send(MissionEvent::Idle("test idle1".into()))
         .await
         .unwrap();
-    tx.send(MissionEvent::Radar(15.0)).await.unwrap();
-    tx.send(MissionEvent::Camera(25.0)).await.unwrap();
+    tx.send(MissionEvent::Radar(Detected { dist: 15.0 })).await.unwrap();
+    tx.send(MissionEvent::Camera(Detected { dist: 15.0 })).await.unwrap();
     // tx.send(MissionEvent::Radar(16)).await.unwrap();
     // tx.send(MissionEvent::Radar(17)).await.unwrap();
-    tx.send(MissionEvent::Radar(30.0)).await.unwrap();
-    tx.send(MissionEvent::Camera(50.0)).await.unwrap();
+    tx.send(MissionEvent::Radar(Detected { dist: 30.0 })).await.unwrap();
+    tx.send(MissionEvent::Camera(Detected { dist: 50.0 })).await.unwrap();
     tx.send(MissionEvent::Idle("test idle2".into()))
         .await
         .unwrap();

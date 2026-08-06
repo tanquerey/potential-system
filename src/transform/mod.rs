@@ -1,10 +1,8 @@
-pub mod decision;
 pub mod confidence;
+pub mod decision;
 
 use flux_perception::Engine;
 
-use crate::{event::MissionEvent};
-
 pub trait DecisionModule {
-    fn decide(&self, engine : &Engine) -> MissionEvent;
+    fn read_fused_value(&self, engine: &Engine) -> f64;
 }

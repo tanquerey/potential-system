@@ -1,11 +1,11 @@
-use std::time::{ SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use flux_confidence::Confidence;
 use flux_perception::Engine;
 
 use crate::{
     agents::{Agent, MissionEntry},
-    event::MissionEvent,
+    event::MissionEvent::{self, Alert},
     transform::{DecisionModule, decision::SensorAwareDecision},
 };
 
@@ -52,7 +52,7 @@ impl Agent for PatrolDrone {
         let sensor_aware_module = SensorAwareDecision;
 
         match event {
-            MissionEvent::Radar(target_dist) => {
+            MissionEvent::Radar(target) => {
                 println!(
                     "Radar confidence Before :{} with agreement :{} with age :{}",
                     self.radar_confidence.value(),
@@ -72,15 +72,17 @@ impl Agent for PatrolDrone {
                 safe_update(
                     engine,
                     1,
-                    *target_dist,
+                    target.dist,
                     self.radar_confidence.value(),
                     now_u64(),
                 )?;
-
-                Ok(MissionEntry::new(1, sensor_aware_module.decide(engine)))
+                let tracking = target
+                    .clone()
+                    .track(sensor_aware_module.read_fused_value(engine));
+                Ok(MissionEntry::new(1, Alert(tracking)))
             }
 
-            MissionEvent::Camera(target_dist) => {
+            MissionEvent::Camera(target) => {
                 // println!("Camera confidence Before :{} with agreement :{}", self.camera_confidence.value(), engine.agreement());
                 self.camera_confidence.update(engine.agreement(), 1.0);
                 // println!("Camera confidence After :{} with agreement :{}", self.camera_confidence.value(), engine.agreement());
@@ -88,12 +90,14 @@ impl Agent for PatrolDrone {
                 safe_update(
                     engine,
                     2,
-                    *target_dist,
+                    target.dist,
                     self.camera_confidence.value(),
                     now_u64(),
                 )?;
-
-                Ok(MissionEntry::new(1, sensor_aware_module.decide(engine)))
+                let tracking = target
+                    .clone()
+                    .track(sensor_aware_module.read_fused_value(engine));
+                Ok(MissionEntry::new(1, Alert(tracking)))
             }
 
             _ => Ok(MissionEntry::new(self.id, event.clone())),

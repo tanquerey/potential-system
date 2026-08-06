@@ -21,10 +21,10 @@ impl Agent for Interceptor {
         _engine: &mut Engine,
     ) -> Result<MissionEntry, EngineError> {
         match event {
-            MissionEvent::Intercept(target_dist) => {
+            MissionEvent::Intercept(target) => {
                 println!(
                     "Interceptor {} received Intercept cmd for target at : {}",
-                    self.id, target_dist
+                    self.id, target.dist
                 );
                 let response =
                     MissionEvent::Idle(format!("Interceptor {} engaged target!", self.id));

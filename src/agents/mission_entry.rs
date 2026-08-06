@@ -15,7 +15,6 @@ impl MissionEntry {
             agent_id,
             timestamp: SystemTime::now(),
             event,
-            
         }
     }
 }

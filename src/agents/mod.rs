@@ -2,6 +2,7 @@ pub mod interceptor;
 pub mod mission_entry;
 pub mod patrol_drone;
 pub mod agent_type;
+pub mod target;
 
 use flux_perception::Engine;
 pub use interceptor::Interceptor;
