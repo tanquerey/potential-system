@@ -1,5 +1,6 @@
 use crate::agents::{Agent, AgentType, Interceptor};
 use crate::event::MissionEvent::{self, Intercept};
+use crate::event::SourcedEvent;
 use tokio::sync::mpsc;
 
 pub struct Coordinator {
@@ -15,15 +16,17 @@ impl Coordinator {
         self.agents.push(agent);
     }
 
-    pub async fn run(&mut self, mut receiver: mpsc::Receiver<MissionEvent>) {
+    pub async fn run(&mut self, mut receiver: mpsc::Receiver<SourcedEvent>) {
         let mut interceptor = Interceptor { id: 3 };
 
-        while let Some(event) = receiver.recv().await {
+        while let Some(sourced) = receiver.recv().await {
             let mut entries = Vec::new();
             for agent in &mut self.agents {
-                match agent.act(&event) {
-                    Ok(entry) => entries.push(entry),
-                    Err(e) => eprintln!("Agent {} failed to act: {:?}", agent.id(), e),
+                if agent.id() == sourced.drone_id {
+                    match agent.act(&sourced.event) {
+                        Ok(entry) => entries.push(entry),
+                        Err(e) => eprintln!("Agent {} failed to act: {:?}", agent.id(), e),
+                    }
                 }
             }
 

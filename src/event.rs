@@ -9,6 +9,13 @@ pub enum MissionEvent {
     Command(String),
     Idle(String),
 }
+
+#[derive(Debug, Clone)]
+pub struct SourcedEvent {
+    pub drone_id: u32,
+    pub event: MissionEvent,
+}
+
 pub struct SensorId {
     pub id: u8,
 }

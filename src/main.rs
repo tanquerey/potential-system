@@ -6,7 +6,7 @@ use crate::agents::AgentType::{self};
 use crate::agents::PatrolDrone;
 use crate::agents::target::Detected;
 use crate::coordinator::Coordinator;
-use crate::event::{CAMERA, MissionEvent, RADAR};
+use crate::event::{CAMERA, MissionEvent, RADAR, SourcedEvent};
 use flux_confidence::Confidence;
 use flux_perception::Engine;
 use tokio::sync::mpsc;
@@ -46,15 +46,21 @@ async fn main() {
         let tx_clone = tx.clone(); // new handle to the SAME channel
         let task = tokio::spawn(async move {
             tx_clone
-                .send(MissionEvent::Radar(Detected {
-                    dist: 15.0 * drone_id as f64,
-                }))
+                .send(SourcedEvent{
+                    drone_id: drone_id,
+                    event: MissionEvent::Radar(Detected {
+                    dist: 25.0 * drone_id as f64,
+                })
+                })
                 .await
                 .unwrap();
             tx_clone
-                .send(MissionEvent::Camera(Detected {
+                .send(SourcedEvent{
+                    drone_id: drone_id,
+                    event: MissionEvent::Camera(Detected {
                     dist: 25.0 * drone_id as f64,
-                }))
+                })
+                })
                 .await
                 .unwrap();
         });
