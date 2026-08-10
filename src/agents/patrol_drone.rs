@@ -5,14 +5,18 @@ use flux_perception::Engine;
 
 use crate::{
     agents::{Agent, MissionEntry},
-    event::MissionEvent::{self, Alert},
-    transform::{DecisionModule, decision::SensorAwareDecision},
+    event::{
+        CAMERA,
+        MissionEvent::{self, Alert},
+        RADAR,
+    },
 };
 
 pub struct PatrolDrone {
     pub id: u32,
-    pub camera_confidence: Confidence,
+    pub engine: Engine,
     pub radar_confidence: Confidence,
+    pub camera_confidence: Confidence,
 }
 
 fn now_u64() -> u64 {
@@ -44,60 +48,52 @@ fn safe_update(
 }
 
 impl Agent for PatrolDrone {
-    fn act(
-        &mut self,
-        event: &MissionEvent,
-        engine: &mut Engine,
-    ) -> Result<MissionEntry, EngineError> {
-        let sensor_aware_module = SensorAwareDecision;
-
+    fn act(&mut self, event: &MissionEvent) -> Result<MissionEntry, EngineError> {
         match event {
             MissionEvent::Radar(target) => {
                 println!(
-                    "Radar confidence Before :{} with agreement :{} with age :{}",
+                    "Agent {} Radar confidence Before :{} with agreement :{} with age :{}",
+                    self.id,
                     self.radar_confidence.value(),
-                    engine.agreement(),
+                    self.engine.agreement(),
                     self.radar_confidence.age()
                 );
-                self.radar_confidence.update(engine.agreement(), 1.0);
 
-                self.radar_confidence.decay();
-
-                println!(
-                    "Radar confidence After :{} with agreement :{} with age :{}",
-                    self.radar_confidence.value(),
-                    engine.agreement(),
-                    self.radar_confidence.age()
-                );
                 safe_update(
-                    engine,
-                    1,
+                    &mut self.engine,
+                    RADAR.id,
                     target.dist,
                     self.radar_confidence.value(),
                     now_u64(),
                 )?;
-                let tracking = target
-                    .clone()
-                    .track(sensor_aware_module.read_fused_value(engine));
-                Ok(MissionEntry::new(1, Alert(tracking)))
+                self.radar_confidence.update(self.engine.agreement(), 1.0);
+                println!(
+                    "Agent {} Radar confidence After :{} with agreement :{} with age :{}",
+                    self.id,
+                    self.radar_confidence.value(),
+                    self.engine.agreement(),
+                    self.radar_confidence.age()
+                );
+                let tracking = target.clone().track(self.engine.read().value);
+
+                Ok(MissionEntry::new(self.id, Alert(tracking)))
             }
 
             MissionEvent::Camera(target) => {
                 // println!("Camera confidence Before :{} with agreement :{}", self.camera_confidence.value(), engine.agreement());
-                self.camera_confidence.update(engine.agreement(), 1.0);
-                // println!("Camera confidence After :{} with agreement :{}", self.camera_confidence.value(), engine.agreement());
 
                 safe_update(
-                    engine,
-                    2,
+                    &mut self.engine,
+                    CAMERA.id,
                     target.dist,
                     self.camera_confidence.value(),
                     now_u64(),
                 )?;
-                let tracking = target
-                    .clone()
-                    .track(sensor_aware_module.read_fused_value(engine));
-                Ok(MissionEntry::new(1, Alert(tracking)))
+                self.camera_confidence.update(self.engine.agreement(), 1.0);
+                // println!("Camera confidence After :{} with agreement :{}", self.camera_confidence.value(), engine.agreement());
+
+                let tracking = target.clone().track(self.engine.read().value);
+                Ok(MissionEntry::new(self.id, Alert(tracking)))
             }
 
             _ => Ok(MissionEntry::new(self.id, event.clone())),

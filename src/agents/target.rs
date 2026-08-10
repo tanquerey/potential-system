@@ -26,7 +26,7 @@ impl Detected {
 impl Tracking {
     // only a Tracking target can become Intercepting — and only if confident enough
     pub fn intercept(self) -> Option<Intercepting> {
-        if self.confidence >= 0.5 {
+        if self.confidence > 20.0 {
             Some(Intercepting { dist: self.dist })
         } else {
             None

@@ -1,6 +1,5 @@
 use crate::agents::{Agent, AgentType, Interceptor};
 use crate::event::MissionEvent::{self, Intercept};
-use flux_perception::Engine;
 use tokio::sync::mpsc;
 
 pub struct Coordinator {
@@ -16,17 +15,13 @@ impl Coordinator {
         self.agents.push(agent);
     }
 
-    pub async fn run(
-        &mut self,
-        mut receiver: mpsc::Receiver<MissionEvent>,
-        mut engine: &mut Engine,
-    ) {
+    pub async fn run(&mut self, mut receiver: mpsc::Receiver<MissionEvent>) {
         let mut interceptor = Interceptor { id: 3 };
 
         while let Some(event) = receiver.recv().await {
             let mut entries = Vec::new();
             for agent in &mut self.agents {
-                match agent.act(&event, &mut engine) {
+                match agent.act(&event) {
                     Ok(entry) => entries.push(entry),
                     Err(e) => eprintln!("Agent {} failed to act: {:?}", agent.id(), e),
                 }
@@ -34,20 +29,16 @@ impl Coordinator {
 
             for entry in entries {
                 match &entry.event {
-                    MissionEvent::Alert(target_dist) => match target_dist.clone().intercept() {
+                    MissionEvent::Alert(tracking) => match tracking.clone().intercept() {
                         Some(intercepting) => {
-                            println!(
-                                "ALERT from Agent {}: Intercepting target at distance {:?}",
-                                entry.agent_id, target_dist
-                            );
-                            if let Err(e) = interceptor.act(&Intercept(intercepting), &mut engine) {
+                            if let Err(e) = interceptor.act(&Intercept(intercepting)) {
                                 eprintln!("Interceptor failed: {:?}", e);
                             }
                         }
                         None => {
                             println!(
-                                "ALERT from Agent {}: target at {:?} not confident enough to intercept",
-                                entry.agent_id, target_dist
+                                "ALERT from Agent {}: target {:?} not confident enough to intercept",
+                                entry.agent_id, tracking
                             );
                         }
                     },
@@ -64,10 +55,7 @@ impl Coordinator {
                         println!("Agent {} is Idle with msg:{}", entry.agent_id, msg)
                     }
                     MissionEvent::Intercept(intercepting) => {
-                        println!(
-                            "Agent {} intercepted :{}",
-                            entry.agent_id, intercepting.dist
-                        )
+                        println!("Agent {} intercepted {:?}", entry.agent_id, intercepting)
                     }
                 }
             }

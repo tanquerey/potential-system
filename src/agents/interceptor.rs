@@ -1,5 +1,3 @@
-use flux_perception::Engine;
-
 use crate::{
     agents::{Agent, MissionEntry, patrol_drone::EngineError},
     event::MissionEvent,
@@ -18,7 +16,6 @@ impl Agent for Interceptor {
     fn act(
         &mut self,
         event: &MissionEvent,
-        _engine: &mut Engine,
     ) -> Result<MissionEntry, EngineError> {
         match event {
             MissionEvent::Intercept(target) => {
