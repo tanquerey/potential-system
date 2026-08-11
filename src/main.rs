@@ -10,6 +10,7 @@ use crate::event::{CAMERA, MissionEvent, RADAR, SourcedEvent};
 use flux_confidence::Confidence;
 use flux_perception::Engine;
 use tokio::sync::mpsc;
+use tokio::time::Instant;
 
 #[tokio::main]
 async fn main() {
@@ -24,6 +25,7 @@ async fn main() {
         engine: engine, //Engine::new(0.6).add_sensor(RADAR.id, 0.3, 0.0),
         camera_confidence: Confidence::new(0.7),
         radar_confidence: Confidence::new(0.7),
+        last_seen: Instant::now(),
     }));
 
     let mut engine = Engine::new(0.7);
@@ -34,6 +36,7 @@ async fn main() {
         engine: engine, //Engine::new(0.7),
         camera_confidence: Confidence::new(0.7),
         radar_confidence: Confidence::new(0.7),
+        last_seen: Instant::now(),
     }));
 
     let coordinator_task = tokio::spawn(async move {
@@ -49,7 +52,7 @@ async fn main() {
                 .send(SourcedEvent{
                     drone_id: drone_id,
                     event: MissionEvent::Radar(Detected {
-                    dist: 25.0 * drone_id as f64,
+                    dist: 15.0 * drone_id as f64,
                 })
                 })
                 .await

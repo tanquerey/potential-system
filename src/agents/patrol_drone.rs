@@ -2,6 +2,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use flux_confidence::Confidence;
 use flux_perception::Engine;
+use tokio::time::Instant;
 
 use crate::{
     agents::{Agent, MissionEntry},
@@ -17,6 +18,7 @@ pub struct PatrolDrone {
     pub engine: Engine,
     pub radar_confidence: Confidence,
     pub camera_confidence: Confidence,
+    pub last_seen: Instant,
 }
 
 fn now_u64() -> u64 {
@@ -49,6 +51,7 @@ fn safe_update(
 
 impl Agent for PatrolDrone {
     fn act(&mut self, event: &MissionEvent) -> Result<MissionEntry, EngineError> {
+        self.last_seen = Instant::now();
         match event {
             MissionEvent::Radar(target) => {
                 println!(
@@ -102,5 +105,9 @@ impl Agent for PatrolDrone {
 
     fn id(&self) -> u32 {
         self.id
+    }
+    
+    fn last_seen(&self) -> Option<Instant> {
+        Some(self.last_seen)
     }
 }
