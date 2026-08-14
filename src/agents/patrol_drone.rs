@@ -2,6 +2,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use flux_confidence::Confidence;
 use flux_perception::Engine;
+use glam::Vec3;
 use tokio::time::Instant;
 
 use crate::{
@@ -14,7 +15,8 @@ use crate::{
 };
 
 pub struct PatrolDrone {
-    pub id: u32,
+    pub id: u8,
+    pub current_pos: Vec3,
     pub engine: Engine,
     pub radar_confidence: Confidence,
     pub camera_confidence: Confidence,
@@ -36,13 +38,19 @@ pub enum EngineError {
 fn safe_update(
     engine: &mut Engine,
     sensor_id: u8,
-    value: f64,
+    current_pos: Vec3,
+    value: Vec3,
     confidence: f64,
     now: u64,
 ) -> Result<(), EngineError> {
     match engine.find_sensor(sensor_id) {
         Some(s) if s.active => {
-            engine.update(sensor_id, value, confidence, now);
+            engine.update(
+                sensor_id,
+                value.distance(current_pos) as f64,
+                confidence,
+                now,
+            );
             Ok(())
         }
         _ => Err(EngineError::UnknownOrInactiveSensor(sensor_id)),
@@ -65,20 +73,21 @@ impl Agent for PatrolDrone {
                 safe_update(
                     &mut self.engine,
                     RADAR.id,
-                    target.dist,
+                    self.current_pos,
+                    target.pos,
                     self.radar_confidence.value(),
                     now_u64(),
                 )?;
                 self.radar_confidence.update(self.engine.agreement(), 1.0);
+
+                let tracking = target.clone().track(self.engine.read().value);
                 println!(
-                    "Agent {} Radar confidence After :{} with agreement :{} with age :{}",
+                    "Agent {} Radar confidence After :{} with agreement :{} with value :{}",
                     self.id,
                     self.radar_confidence.value(),
                     self.engine.agreement(),
-                    self.radar_confidence.age()
+                    self.engine.read().value
                 );
-                let tracking = target.clone().track(self.engine.read().value);
-
                 Ok(MissionEntry::new(self.id, Alert(tracking)))
             }
 
@@ -88,7 +97,8 @@ impl Agent for PatrolDrone {
                 safe_update(
                     &mut self.engine,
                     CAMERA.id,
-                    target.dist,
+                    self.current_pos,
+                    target.pos,
                     self.camera_confidence.value(),
                     now_u64(),
                 )?;
@@ -103,10 +113,10 @@ impl Agent for PatrolDrone {
         }
     }
 
-    fn id(&self) -> u32 {
+    fn id(&self) -> u8 {
         self.id
     }
-    
+
     fn last_seen(&self) -> Option<Instant> {
         Some(self.last_seen)
     }

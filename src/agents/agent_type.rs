@@ -16,7 +16,7 @@ impl Agent for AgentType {
         }
     }
 
-    fn id(&self) -> u32 {
+    fn id(&self) -> u8 {
         match self {
             AgentType::Patrol(p) => p.id(),
             AgentType::Interceptor(i) => i.id(),

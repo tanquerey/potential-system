@@ -1,23 +1,29 @@
+use glam::Vec3;
+
 #[derive(Debug, Clone)]
 pub struct Detected {
-    pub dist: f64,
+    pub pos: Vec3,
+    pub target_id: u8,
 }
 
 #[derive(Debug, Clone)]
 pub struct Tracking {
-    pub dist: f64,
+    pub pos: Vec3,
+    pub target_id: u8,
     pub confidence: f64,
 }
 
 #[derive(Debug, Clone)]
 pub struct Intercepting {
-    pub dist: f64,
+    pub target_id: u8,
+    pub pos: Vec3,
 }
 
 impl Detected {
     pub fn track(self, confidence: f64) -> Tracking {
         Tracking {
-            dist: self.dist,
+            pos: self.pos,
+            target_id: self.target_id,
             confidence,
         }
     }
@@ -26,8 +32,11 @@ impl Detected {
 impl Tracking {
     // only a Tracking target can become Intercepting — and only if confident enough
     pub fn intercept(self) -> Option<Intercepting> {
-        if self.confidence > 20.0 {
-            Some(Intercepting { dist: self.dist })
+        if self.confidence > 19.0 {
+            Some(Intercepting {
+                target_id: self.target_id,
+                pos: self.pos,
+            })
         } else {
             None
         }

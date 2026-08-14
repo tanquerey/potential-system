@@ -12,7 +12,7 @@ pub enum MissionEvent {
 
 #[derive(Debug, Clone)]
 pub struct SourcedEvent {
-    pub drone_id: u32,
+    pub drone_id: u8,
     pub event: MissionEvent,
 }
 

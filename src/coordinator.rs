@@ -1,5 +1,8 @@
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use crate::agents::interceptor::ClaimedTargets;
 use crate::agents::{Agent, AgentType, Interceptor, MissionEntry};
 use crate::event::MissionEvent::{self, Intercept};
 use crate::event::SourcedEvent;
@@ -20,7 +23,18 @@ impl Coordinator {
     }
 
     pub async fn run(&mut self, mut receiver: mpsc::Receiver<SourcedEvent>) {
-        let mut interceptor = Interceptor { id: 3 };
+        let targets: ClaimedTargets = Arc::new(Mutex::new(HashSet::new()));
+
+        let mut interceptors = vec![
+            Interceptor {
+                id: 3,
+                claimed: targets.clone(),
+            },
+            Interceptor {
+                id: 4,
+                claimed: targets.clone(),
+            },
+        ];
         let mut watchdog_tick: Interval = interval(Duration::from_secs(5));
         let stale_after = Duration::from_secs(10);
 
@@ -28,7 +42,7 @@ impl Coordinator {
             tokio::select! {
                 maybe_event = receiver.recv() => {
                     match maybe_event {
-                        Some(sourced) => self.handle_event(sourced, &mut interceptor),
+                        Some(sourced) => self.handle_event(sourced, &mut interceptors),
                         None => break, // all senders dropped, channel closed — shut down
                     }
                 }
@@ -39,23 +53,30 @@ impl Coordinator {
         }
     }
 
-    fn handle_event(&mut self, sourced: SourcedEvent, interceptor: &mut Interceptor) {
+    fn handle_event(&mut self, sourced: SourcedEvent, interceptors: &mut Vec<Interceptor>) {
         for agent in &mut self.agents {
             if agent.id() == sourced.drone_id {
                 match agent.act(&sourced.event) {
-                    Ok(entry) => Self::log_entry(&entry, interceptor),
+                    Ok(entry) => Self::log_entry(&entry, interceptors),
                     Err(e) => eprintln!("Agent {} failed to act: {:?}", agent.id(), e),
                 }
             }
         }
     }
 
-    fn log_entry(entry: &MissionEntry, interceptor: &mut Interceptor) {
+    fn log_entry(entry: &MissionEntry, interceptors: &mut Vec<Interceptor>) {
         match &entry.event {
             MissionEvent::Alert(tracking) => match tracking.clone().intercept() {
                 Some(intercepting) => {
-                    if let Err(e) = interceptor.act(&Intercept(intercepting)) {
-                        eprintln!("Interceptor failed: {:?}", e);
+                    for interceptor in interceptors {
+                        if interceptor.try_claim(intercepting.target_id) {
+                            match interceptor.act(&Intercept(intercepting.clone())) {
+                                Ok(_) => break, // claimed and acted — stop trying other interceptors
+                                Err(e) => eprintln!("Interceptor failed: {:?}", e),
+                            }
+                        } else {
+                            eprintln!("Target already acquired: {:?}", intercepting);
+                        }
                     }
                 }
                 None => {
