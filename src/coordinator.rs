@@ -8,6 +8,7 @@ use crate::event::MissionEvent::{self, Intercept};
 use crate::event::SourcedEvent;
 use tokio::sync::mpsc;
 use tokio::time::{Instant, Interval, interval};
+use tokio_util::sync::CancellationToken;
 
 pub struct Coordinator {
     agents: Vec<AgentType>,
@@ -22,7 +23,11 @@ impl Coordinator {
         self.agents.push(agent);
     }
 
-    pub async fn run(&mut self, mut receiver: mpsc::Receiver<SourcedEvent>) {
+    pub async fn run(
+        &mut self,
+        mut receiver: mpsc::Receiver<SourcedEvent>,
+        shutdown: CancellationToken,
+    ) {
         let targets: ClaimedTargets = Arc::new(Mutex::new(HashSet::new()));
 
         let mut interceptors = vec![
@@ -45,6 +50,10 @@ impl Coordinator {
                         Some(sourced) => self.handle_event(sourced, &mut interceptors),
                         None => break, // all senders dropped, channel closed — shut down
                     }
+                }
+                _ = shutdown.cancelled() => {
+                    println!("Graceful shutdown of drone");
+                    break;
                 }
                 _ = watchdog_tick.tick() => {
                     self.check_watchdog(stale_after);
@@ -76,6 +85,7 @@ impl Coordinator {
                             }
                         } else {
                             eprintln!("Target already acquired: {:?}", intercepting);
+                            break;
                         }
                     }
                 }
