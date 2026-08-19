@@ -9,3 +9,4 @@ rand = "0.8"
 flux-confidence = { git = "https://github.com/Lucineer/flux-confidence" }
 flux-perception = "0.1.0"
 glam = "0.33.3"
+tokio-util = "0.7.19"

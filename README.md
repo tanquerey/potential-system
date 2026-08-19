@@ -11,24 +11,24 @@ The guiding principle: every feature added should either make the simulation mor
 ## Architecture
 
 ```
-┌─────────────┐     mpsc::Sender (cloned per drone)     ┌──────────────┐
-│ PatrolDrone  │ ───────────────────────────────────────▶│              │
-│  (task 1)    │                                          │              │
+┌─────────────┐     mpsc::Sender (cloned per drone)      ┌──────────────┐
+│ PatrolDrone │ ───────────────────────────────────────▶ │              │
+│  (task 1)   │                                          │              │
 └─────────────┘                                          │              │
-                                                           │ Coordinator  │
+                                                         │ Coordinator  │
 ┌─────────────┐                                          │  (task)      │
-│ PatrolDrone  │ ───────────────────────────────────────▶│              │
-│  (task 2)    │        SourcedEvent { drone_id, event }  │              │
+│ PatrolDrone │ ───────────────────────────────────────▶ │              │
+│  (task 2)   │     SourcedEvent { drone_id, event }     │              │
 └─────────────┘                                          └──────┬───────┘
                                                                   │
                                                      tokio::select!
                                                      races: new event
-                                                            vs. watchdog tick
+                                                      vs. watchdog tick
                                                                   │
                                               ┌───────────────────┴───────────────────┐
                                               ▼                                       ▼
-                                    per-agent routing by                    stale-drone detection
-                                    drone_id, dispatch to                   via last_seen
+                                    per-agent routing by             stale-drone detection
+                                    drone_id, dispatch to                 via last_seen
                                     matching PatrolDrone
                                               │
                                               ▼
